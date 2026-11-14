@@ -46,7 +46,8 @@ func TestUsageAndMissingKey(t *testing.T) {
 		t.Fatalf("chat code=%d stderr=%s", code, stderr.String())
 	}
 	stderr.Reset()
-	if code := execute([]string{"status"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "未设置 DEEPSEEK_API_KEY") {
+	missingCfg := filepath.Join(t.TempDir(), "missing.yaml")
+	if code := execute([]string{"--config", missingCfg, "status"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "未设置 DEEPSEEK_API_KEY") {
 		t.Fatalf("status code=%d stderr=%s", code, stderr.String())
 	}
 }
@@ -73,28 +74,43 @@ func TestStatusWaitsForBothCalls(t *testing.T) {
 	}))
 	defer srv.Close()
 	t.Setenv("DEEPSEEK_BASE_URL", srv.URL)
+	t.Setenv("DEEPSEEK_MODEL", "")
+	emptyCfg := filepath.Join(t.TempDir(), "empty.yaml")
 
 	var stdout, stderr bytes.Buffer
-	if code := execute([]string{"status"}, &stdout, &stderr); code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "余额失败") {
+	if code := execute([]string{"--config", emptyCfg, "status"}, &stdout, &stderr); code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "余额失败") {
 		t.Fatalf("fail code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	failBalance = false
 	stdout.Reset()
 	stderr.Reset()
-	code := execute([]string{"--json", "status"}, &stdout, &stderr)
+	code := execute([]string{"--config", emptyCfg, "--json", "status"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("ok code=%d stderr=%s", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), `"ok": false`) || !strings.Contains(stdout.String(), `"topped_up": "100.00"`) {
+	if !strings.Contains(stdout.String(), `"ok": false`) || !strings.Contains(stdout.String(), `"topped_up": "100.00"`) || !strings.Contains(stdout.String(), `"default_model": "deepseek-flash"`) {
 		t.Fatalf("json %s", stdout.String())
 	}
 	stdout.Reset()
-	if code := execute([]string{"status"}, &stdout, &stderr); code != 0 {
+	if code := execute([]string{"--config", emptyCfg, "status"}, &stdout, &stderr); code != 0 {
 		t.Fatal(stderr.String())
 	}
-	want := "密钥不可用\ndeepseek-flash    DeepSeek-V4.1-Flash\nCNY  总额 110.00  赠送 10.00  充值 100.00\n"
+	want := "密钥不可用\n默认模型 deepseek-flash\ndeepseek-flash    DeepSeek-V4.1-Flash\nCNY  总额 110.00  赠送 10.00  充值 100.00\n"
 	if stdout.String() != want {
 		t.Fatalf("text %q", stdout.String())
+	}
+	cfg := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(cfg, []byte("model: deepseek-v4-pro\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	if code := execute([]string{"--config", cfg, "status"}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "默认模型 deepseek-v4-pro\n") {
+		t.Fatalf("config model code=%d stdout=%q stderr=%s", code, stdout.String(), stderr.String())
+	}
+	t.Setenv("DEEPSEEK_MODEL", "deepseek-flash")
+	stdout.Reset()
+	if code := execute([]string{"--config", cfg, "status"}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "默认模型 deepseek-flash\n") {
+		t.Fatalf("env model code=%d stdout=%q stderr=%s", code, stdout.String(), stderr.String())
 	}
 }
 

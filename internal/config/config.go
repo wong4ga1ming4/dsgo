@@ -16,7 +16,7 @@ const (
 )
 
 // Settings is the resolved runtime configuration.
-// Environment variables win over the file for the key and base URL.
+// Environment variables win over the file for the key, base URL, and model.
 type Settings struct {
 	APIKey  string
 	BaseURL string
@@ -79,6 +79,9 @@ func Load(flag string) (Settings, error) {
 	}
 	if env := strings.TrimSpace(os.Getenv("DEEPSEEK_BASE_URL")); env != "" {
 		settings.BaseURL = strings.TrimRight(env, "/")
+	}
+	if env := strings.TrimSpace(os.Getenv("DEEPSEEK_MODEL")); env != "" {
+		settings.Model = env
 	}
 	return settings, nil
 }

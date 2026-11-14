@@ -37,6 +37,7 @@ func newStatus() *cobra.Command {
 			} else {
 				text.WriteString("密钥不可用\n")
 			}
+			fmt.Fprintf(&text, "默认模型 %s\n", settings.Model)
 			for _, model := range status.Models {
 				if model.Name != "" && model.Name != model.ID {
 					fmt.Fprintf(&text, "%s    %s\n", model.ID, model.Name)
@@ -48,9 +49,17 @@ func newStatus() *cobra.Command {
 				fmt.Fprintf(&text, "%s  总额 %s  赠送 %s  充值 %s\n",
 					balance.Currency, balance.Total, balance.Granted, balance.ToppedUp)
 			}
-			return writeOut(cmd, text.String(), status)
+			return writeOut(cmd, text.String(), statusView{
+				Status:       status,
+				DefaultModel: settings.Model,
+			})
 		},
 	}
+}
+
+type statusView struct {
+	api.Status
+	DefaultModel string `json:"default_model"`
 }
 
 func newConfig() *cobra.Command {

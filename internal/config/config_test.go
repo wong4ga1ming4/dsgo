@@ -29,6 +29,7 @@ func TestUpdateKeepsUnspecifiedFields(t *testing.T) {
 	}
 	t.Setenv("DEEPSEEK_API_KEY", "")
 	t.Setenv("DEEPSEEK_BASE_URL", "")
+	t.Setenv("DEEPSEEK_MODEL", "")
 	settings, err := Load(written)
 	if err != nil {
 		t.Fatal(err)
@@ -48,13 +49,18 @@ func TestEnvOverridesFile(t *testing.T) {
 	if _, err := Update(path, &key, nil); err != nil {
 		t.Fatal(err)
 	}
+	model := "deepseek-v4-pro"
+	if _, err := Update(path, nil, &model); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("DEEPSEEK_API_KEY", "env-key")
 	t.Setenv("DEEPSEEK_BASE_URL", "https://override.example")
+	t.Setenv("DEEPSEEK_MODEL", "deepseek-flash")
 	settings, err := Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if settings.APIKey != "env-key" || settings.BaseURL != "https://override.example" {
+	if settings.APIKey != "env-key" || settings.BaseURL != "https://override.example" || settings.Model != "deepseek-flash" {
 		t.Fatalf("%+v", settings)
 	}
 }
