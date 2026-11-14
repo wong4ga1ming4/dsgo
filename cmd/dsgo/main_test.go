@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"dsgo/internal/api"
 )
 
 func TestHelpAndRemovedCommands(t *testing.T) {
@@ -93,6 +95,16 @@ func TestStatusWaitsForBothCalls(t *testing.T) {
 	want := "密钥不可用\ndeepseek-flash    DeepSeek-V4.1-Flash\nCNY  总额 110.00  赠送 10.00  充值 100.00\n"
 	if stdout.String() != want {
 		t.Fatalf("text %q", stdout.String())
+	}
+}
+
+func TestChatTextAppendsCitations(t *testing.T) {
+	text := chatText(api.ChatResult{Content: "约 39 万", Citations: []string{"https://example.com/a"}})
+	if text != "约 39 万\n\nhttps://example.com/a\n" {
+		t.Fatalf("%q", text)
+	}
+	if chatText(api.ChatResult{Content: "收到"}) != "收到\n" {
+		t.Fatal(chatText(api.ChatResult{Content: "收到"}))
 	}
 }
 

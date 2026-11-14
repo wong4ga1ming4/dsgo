@@ -86,13 +86,14 @@ func newConfig() *cobra.Command {
 func newChat() *cobra.Command {
 	var model string
 	var files []string
+	var search, deepthink bool
 	cmd := &cobra.Command{
 		Use:   "chat [问题]",
 		Short: "提问一次",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			prompt := strings.TrimSpace(strings.Join(args, " "))
 			if prompt == "" {
-				return exitx.Usage("用法: dsgo chat [--model 模型] [--file 路径] \"问题\"")
+				return exitx.Usage("用法: dsgo chat [--model 模型] [--search] [--deepthink] [--file 路径] \"问题\"")
 			}
 			settings, err := config.Load(configFlag(cmd))
 			if err != nil {
@@ -105,16 +106,30 @@ func newChat() *cobra.Command {
 			if cmd.Flags().Changed("model") {
 				chosen = model
 			}
-			result, err := api.Chat(cmd.Context(), client.New(settings.BaseURL, settings.APIKey), chosen, prompt, files)
+			result, err := api.Chat(cmd.Context(), client.New(settings.BaseURL, settings.APIKey), chosen, prompt, api.ChatOptions{
+				Search:    search,
+				DeepThink: deepthink,
+				Files:     files,
+			})
 			if err != nil {
 				return exitx.Fail(err.Error())
 			}
-			return writeOut(cmd, result.Content+"\n", result)
+			return writeOut(cmd, chatText(result), result)
 		},
 	}
 	cmd.Flags().StringVar(&model, "model", "", "模型 id")
+	cmd.Flags().BoolVar(&search, "search", false, "让模型在服务端联网搜索")
+	cmd.Flags().BoolVar(&deepthink, "deepthink", false, "打开思考；与 --search 合用为深度搜索")
 	cmd.Flags().StringArrayVar(&files, "file", nil, "随问题上传的本地文件")
 	return cmd
+}
+
+func chatText(result api.ChatResult) string {
+	text := strings.TrimRight(result.Content, "\n") + "\n"
+	if len(result.Citations) == 0 {
+		return text
+	}
+	return text + "\n" + strings.Join(result.Citations, "\n") + "\n"
 }
 
 func newSearch() *cobra.Command {

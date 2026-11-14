@@ -67,7 +67,7 @@ func TestChatPlainBody(t *testing.T) {
 		w.Write([]byte(`{"choices":[{"message":{"content":"你好"}}]}`))
 	}))
 	defer srv.Close()
-	result, err := Chat(context.Background(), client.New(srv.URL, "test"), "deepseek-v4-pro", "问题", nil)
+	result, err := Chat(context.Background(), client.New(srv.URL, "test"), "deepseek-v4-pro", "问题", ChatOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,6 +75,35 @@ func TestChatPlainBody(t *testing.T) {
 		t.Fatalf("%+v", result)
 	}
 	if !strings.Contains(body, `"model":"deepseek-v4-pro"`) || !strings.Contains(body, `"content":"问题"`) || !strings.Contains(body, `"stream":false`) || !strings.Contains(body, `"type":"disabled"`) {
+		t.Fatal(body)
+	}
+	if strings.Contains(body, `"tools"`) || strings.Contains(body, "tool_choice") || strings.Contains(body, "web_search_options") {
+		t.Fatal(body)
+	}
+}
+
+func TestChatSearchDeepthink(t *testing.T) {
+	var body string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data, _ := io.ReadAll(r.Body)
+		body = string(data)
+		w.Write([]byte(`{"choices":[{"message":{"content":"约 39 万","annotations":[{"type":"url_citation","url_citation":{"url":"https://example.com/a"}},{"type":"url_citation","url_citation":{"url":"https://example.com/a"}},{"type":"url_citation","url_citation":{"url":" https://example.com/b "}},{"type":"other","url_citation":{"url":"https://example.com/skip"}}]}}]}`))
+	}))
+	defer srv.Close()
+	result, err := Chat(context.Background(), client.New(srv.URL, "test"), "deepseek-v4-pro", "冰岛人口", ChatOptions{Search: true, DeepThink: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Model != "deepseek-flash" || result.Content != "约 39 万" {
+		t.Fatalf("%+v", result)
+	}
+	if len(result.Citations) != 2 || result.Citations[0] != "https://example.com/a" || result.Citations[1] != "https://example.com/b" {
+		t.Fatalf("%+v", result.Citations)
+	}
+	if !strings.Contains(body, `"type":"deepseek_web_search"`) || !strings.Contains(body, `"type":"enabled"`) {
+		t.Fatal(body)
+	}
+	if strings.Contains(body, "tool_choice") || strings.Contains(body, "web_search_options") || strings.Contains(body, "deepseek-v4-pro") {
 		t.Fatal(body)
 	}
 }
@@ -113,7 +142,7 @@ func TestChatUploadsThenAsks(t *testing.T) {
 		}
 	}))
 	defer srv.Close()
-	result, err := Chat(context.Background(), client.New(srv.URL, "test"), "other-model", "总结", []string{path})
+	result, err := Chat(context.Background(), client.New(srv.URL, "test"), "other-model", "总结", ChatOptions{Files: []string{path}})
 	if err != nil {
 		t.Fatal(err)
 	}
